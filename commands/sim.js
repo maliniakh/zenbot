@@ -5,6 +5,7 @@ var tb = require('timebucket')
   , path = require('path')
   , moment = require('moment')
   , colors = require('colors')
+  , Arff = require('arff-utils')
 
 module.exports = function container (get, set, clear) {
   var c = get('conf')
@@ -164,7 +165,31 @@ module.exports = function container (get, set, clear) {
               .replace('{{output}}', html_output)
               .replace(/\{\{symbol\}\}/g,  so.selector.normalized + ' - zenbot ' + require('../package.json').version)
             var out_target = so.filename || 'simulations/sim_result_' + so.selector.normalized +'_' + new Date().toISOString().replace(/T/, '_').replace(/\..+/, '').replace(/-/g, '').replace(/:/g, '').replace(/20/, '') + '_UTC.html'
-            fs.writeFileSync(out_target, out)
+            var basename = 'simulations/sim_result_' + so.selector.normalized +'_' + new Date().toISOString().replace(/T/, '_').replace(/\..+/, '').replace(/-/g, '').replace(/:/g, '').replace(/20/, '');
+
+            var data = s.lookback.slice(0, s.lookback.length - so.min_periods).map(function (period) {
+              return {period: {
+                time: period.time,
+                open: period.open,
+                high: period.high,
+                low: period.low,
+                close: period.close,
+                volume: period.volume
+              }}
+            })
+
+            let arff = getInstances(s.lookback, fibonacciLbStrtgy, 2);
+            var ws = new require('stream');;
+            ws.writable = true;
+            var output = "";
+            ws.write = function(buf) {
+              output += buf;
+            }
+            arff.writeToStream(ws);
+
+            fs.writeFileSync(basename + '.arff', output);
+            // fs.writeFileSync(out_target, out);
+
             console.log('wrote', out_target)
           }
           process.exit(0)
@@ -229,5 +254,75 @@ module.exports = function container (get, set, clear) {
         }
         getNext()
       })
+
+
+    // todo: lookahead moze byc jako argument z cli pobierane
+    /**
+     * Instances jak w RM (input rows)
+     * @param lookBack todo: komcie porobic
+     * @param lbStrgy powinno zawierac 0 - jako terazniejsza wartosc
+     * @param lookAhead
+     */
+    function getInstances(lookBack, lbStrgy, lookAhead) {
+      var resultArr = [];
+      var arff = new Arff.ArffWriter("chuj", Arff.MODE_OBJECT); //todo: dodac nazwe
+
+      for (var step = 0; step < lbStrgy().maxStep; step++) {
+        var lb = lbStrgy().strtgy(step);
+        arff.addNumericAttribute('back' + lb + '.low')
+        arff.addNumericAttribute('back' + lb + '.high')
+        arff.addNumericAttribute('back' + lb + '.open')
+        arff.addNumericAttribute('back' + lb + '.close')
+        arff.addNumericAttribute('back' + lb + '.volume')
+        arff.addNumericAttribute('back' + lb + '.rsi_avg_gain')
+        arff.addNumericAttribute('back' + lb + '.rsi_avg_loss')
+        arff.addNumericAttribute('back' + lb + '.rsi')
+        arff.addNumericAttribute('back' + lb + '.cci')
+        arff.addNumericAttribute('back' + lb + '.srsi_D')
+        arff.addNumericAttribute('back' + lb + '.srsi_K')
+      }
+      arff.addNumericAttribute('ahead' + lookAhead)
+
+
+      for (var i = lookAhead; i < lookBack.length - lbStrgy().maxLookback; i++) {
+        var lbPeriods = {};
+        let normFactor = lookBack[i].close; // do normalizacji
+
+        for (step = 0; step < lbStrgy().maxStep; step++) {
+          let lb = lookBack[i + lbStrgy().strtgy(step)];
+          lbPeriods['back' + step + '.low'] = lb.low / normFactor;
+          lbPeriods['back' + step + '.high'] = lb.high / normFactor;
+          lbPeriods['back' + step + '.open'] = lb.open / normFactor;
+          lbPeriods['back' + step + '.close'] = lb.close / normFactor;
+          lbPeriods['back' + step + '.volume'] = lb.volume / normFactor;
+          lbPeriods['back' + step + '.rsi_avg_gain'] = lb.rsi_avg_gain;
+          lbPeriods['back' + step + '.rsi_avg_loss'] = lb.rsi_avg_loss;
+          lbPeriods['back' + step + '.rsi'] = lb.rsi;
+          lbPeriods['back' + step + '.cci'] = lb.cci;
+          lbPeriods['back' + step + '.srsi_D'] = lb.srsi_D;
+          lbPeriods['back' + step + '.srsi_K'] = lb.srsi_K;
+
+        }
+        lbPeriods['ahead' + lookAhead] = lookBack[i - lookAhead].close / normFactor;
+
+        arff.addData(lbPeriods);
+        resultArr.push({period: lbPeriods});
+      }
+
+      arff.writeToStream(process.stdout);
+
+          return arff;
+      }
+
+      let fibonacciArr = [0, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233];
+      function fibonacciLbStrtgy() {
+        return {
+          maxStep: 8,
+          maxLookback: fibonacciArr[8 - 1],
+          strtgy: function(step) {
+            return fibonacciArr[step];
+          }
+        }
+      }
   }
 }
