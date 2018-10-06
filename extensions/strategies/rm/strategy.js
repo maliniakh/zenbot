@@ -61,12 +61,14 @@ module.exports = function container(get, set, clear) {
         lbPeriods['back' + lbStep + '.open'] = lb.open / normFactor;
         lbPeriods['back' + lbStep + '.close'] = lb.close / normFactor;
         lbPeriods['back' + lbStep + '.volume'] = lb.volume / normFactor;
-        lbPeriods['back' + lbStep + '.rsi_avg_gain'] = lb.rsi_avg_gain;
-        lbPeriods['back' + lbStep + '.rsi_avg_loss'] = lb.rsi_avg_loss;
-        lbPeriods['back' + lbStep + '.rsi'] = lb.rsi;
-        lbPeriods['back' + lbStep + '.cci'] = lb.cci;
-        lbPeriods['back' + lbStep + '.srsi_D'] = lb.srsi_D;
-        lbPeriods['back' + lbStep + '.srsi_K'] = lb.srsi_K;
+        if(step < 5) {
+          lbPeriods['back' + lbStep + '.rsi_avg_gain'] = lb.rsi_avg_gain;
+          lbPeriods['back' + lbStep + '.rsi_avg_loss'] = lb.rsi_avg_loss;
+          lbPeriods['back' + lbStep + '.rsi'] = lb.rsi;
+          lbPeriods['back' + lbStep + '.cci'] = lb.cci;
+          lbPeriods['back' + lbStep + '.srsi_D'] = lb.srsi_D;
+          lbPeriods['back' + lbStep + '.srsi_K'] = lb.srsi_K;
+        }
       }
       Object.keys(lbPeriods).forEach(function(k) {
         if(lbPeriods[k] === undefined) {

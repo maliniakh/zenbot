@@ -179,15 +179,16 @@ module.exports = function container (get, set, clear) {
             })
 
             let arff = getInstances(s.lookback, fibonacciLbStrtgy, 2);
-            var ws = new require('stream');;
+            var ws = new require('stream');
             ws.writable = true;
             var output = "";
             ws.write = function(buf) {
-              output += buf;
+              // output += buf;
+              fs.appendFileSync(basename + '.arff', buf);
             }
             arff.writeToStream(ws);
 
-            fs.writeFileSync(basename + '.arff', output);
+            // fs.writeFileSync(basename + '.arff', output);
             // fs.writeFileSync(out_target, out);
 
             console.log('wrote', out_target)
@@ -274,12 +275,14 @@ module.exports = function container (get, set, clear) {
         arff.addNumericAttribute('back' + lb + '.open')
         arff.addNumericAttribute('back' + lb + '.close')
         arff.addNumericAttribute('back' + lb + '.volume')
-        arff.addNumericAttribute('back' + lb + '.rsi_avg_gain')
-        arff.addNumericAttribute('back' + lb + '.rsi_avg_loss')
-        arff.addNumericAttribute('back' + lb + '.rsi')
-        arff.addNumericAttribute('back' + lb + '.cci')
-        arff.addNumericAttribute('back' + lb + '.srsi_D')
-        arff.addNumericAttribute('back' + lb + '.srsi_K')
+        if(step < 5) {
+          arff.addNumericAttribute('back' + lb + '.rsi_avg_gain')
+          arff.addNumericAttribute('back' + lb + '.rsi_avg_loss')
+          arff.addNumericAttribute('back' + lb + '.rsi')
+          arff.addNumericAttribute('back' + lb + '.cci')
+          // arff.addNumericAttribute('back' + lb + '.srsi_D')
+          // arff.addNumericAttribute('back' + lb + '.srsi_K')
+        }
       }
       arff.addNumericAttribute('ahead' + lookAhead)
 
@@ -290,18 +293,26 @@ module.exports = function container (get, set, clear) {
 
         for (step = 0; step < lbStrgy().maxStep; step++) {
           let lb = lookBack[i + lbStrgy().strtgy(step)];
-          lbPeriods['back' + step + '.low'] = lb.low / normFactor;
-          lbPeriods['back' + step + '.high'] = lb.high / normFactor;
-          lbPeriods['back' + step + '.open'] = lb.open / normFactor;
-          lbPeriods['back' + step + '.close'] = lb.close / normFactor;
-          lbPeriods['back' + step + '.volume'] = lb.volume / normFactor;
-          lbPeriods['back' + step + '.rsi_avg_gain'] = lb.rsi_avg_gain;
-          lbPeriods['back' + step + '.rsi_avg_loss'] = lb.rsi_avg_loss;
-          lbPeriods['back' + step + '.rsi'] = lb.rsi;
-          lbPeriods['back' + step + '.cci'] = lb.cci;
-          lbPeriods['back' + step + '.srsi_D'] = lb.srsi_D;
-          lbPeriods['back' + step + '.srsi_K'] = lb.srsi_K;
+          lbPeriods['back' + step + '.low'] = precise(lb.low / normFactor);
+          lbPeriods['back' + step + '.high'] = precise(lb.high / normFactor);
+          lbPeriods['back' + step + '.open'] = precise(lb.open / normFactor);
+          lbPeriods['back' + step + '.close'] = precise(lb.close / normFactor);
+          lbPeriods['back' + step + '.volume'] = precise(lb.volume / normFactor);
+          if(step < 5) {
+            lbPeriods['back' + step + '.rsi_avg_gain'] = precise(lb.rsi_avg_gain);
+            lbPeriods['back' + step + '.rsi_avg_loss'] = precise(lb.rsi_avg_loss);
+            lbPeriods['back' + step + '.rsi'] = precise(lb.rsi);
+            lbPeriods['back' + step + '.cci'] = precise(lb.cci);
+            // lbPeriods['back' + step + '.srsi_D'] = precise(lb.srsi_D);
+            // lbPeriods['back' + step + '.srsi_K'] = precise(lb.srsi_K);
+          }
 
+          // todo: infinity tez sprawdzic
+          for(var k in lbPeriods) {
+            if(lbPeriods[k] === null || isNaN(lbPeriods[k])) {
+              throw new Error(k);
+            }
+          }
         }
         lbPeriods['ahead' + lookAhead] = lookBack[i - lookAhead].close / normFactor;
 
@@ -309,20 +320,25 @@ module.exports = function container (get, set, clear) {
         resultArr.push({period: lbPeriods});
       }
 
-      arff.writeToStream(process.stdout);
+      // arff.writeToStream(process.stdout);
 
-          return arff;
+        return arff;
       }
 
-      let fibonacciArr = [0, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233];
-      function fibonacciLbStrtgy() {
-        return {
-          maxStep: 8,
-          maxLookback: fibonacciArr[8 - 1],
-          strtgy: function(step) {
-            return fibonacciArr[step];
-          }
+    let fibonacciArr = [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 13, 15, 17, 19, 21, 24, 27, 30, 34, 40, 55, 77, 89, 120, 144, 160, 190, 233, 270, 300, 350, 400, 500, 600];
+
+    function fibonacciLbStrtgy() {
+      return {
+        maxStep: fibonacciArr.length,
+        maxLookback: fibonacciArr[fibonacciArr.length - 1],
+        strtgy: function (step) {
+          return fibonacciArr[step];
         }
       }
+    }
+
+    function precise(x) {
+      return Number.parseFloat(x).toFixed(3);
+    }
   }
-}
+};
