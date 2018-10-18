@@ -204,7 +204,7 @@ module.exports = function (program, conf) {
           var out_target = so.filename || 'simulations/sim_result_' + so.selector.normalized +'_' + new Date().toISOString().replace(/T/, '_').replace(/\..+/, '').replace(/-/g, '').replace(/:/g, '').replace(/20/, '') + '_UTC.html'
           var basename = 'simulations/sim_result_' + so.selector.normalized +'_' + new Date().toISOString().replace(/T/, '_').replace(/\..+/, '').replace(/-/g, '').replace(/:/g, '').replace(/20/, '')
 
-          var data = s.lookback.slice(0, s.lookback.length - so.min_periods).map(function (period) {
+          data = s.lookback.slice(0, s.lookback.length - so.min_periods).map(function (period) {
             return {period: {
               time: period.time,
               open: period.open,
@@ -337,6 +337,7 @@ module.exports = function (program, conf) {
       arff.addNumericAttribute('ahead' + k + '.high')
       arff.addNumericAttribute('ahead' + k + '.close')
     }
+    arff.addNominalAttribute('trend')
 
 
     for (var i = lookAhead; i < lookBack.length - lbStrgy().maxLookback; i++) {
@@ -369,11 +370,23 @@ module.exports = function (program, conf) {
       }
 
       // dodajemy wszystkie ahead(1--lookAhead)
+      var trend = null
+      var low, high, close  // do trendu
       for(k = 1; k <= lookAhead; k ++) {
-        lbPeriods['ahead' + k + '.low'] = precise(lookBack[i - k].low / normFactor)
-        lbPeriods['ahead' + k + '.high'] = precise(lookBack[i - k].high / normFactor)
-        lbPeriods['ahead' + k + '.close'] = precise(lookBack[i - k].close / normFactor)
+        lbPeriods['ahead' + k + '.low'] = low = precise(lookBack[i - k].low / normFactor)
+        lbPeriods['ahead' + k + '.high'] = high = precise(lookBack[i - k].high / normFactor)
+        lbPeriods['ahead' + k + '.close'] = close = precise(lookBack[i - k].close / normFactor)
+        // trend
+        if(trend === null) {
+          // todo: sparametryzowac ten prog tutaj
+          if(low <= 0.998) {
+            trend = 'down'
+          } else if (high >= 1.002) {
+            trend = 'up'
+          }
+        }
       }
+      lbPeriods['trend'] = trend || 'flat'
 
       arff.addData(lbPeriods)
       resultArr.push({period: lbPeriods})
