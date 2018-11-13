@@ -1,7 +1,7 @@
 var request = require('request')
 var rp = require('request-promise')
 
-let lbStrgy = fibonacciLbStrtgy;
+let lbStrgy = fibonacciLbStrtgy
 module.exports = function container(get, set, clear) {
   return {
     name: 'rm',
@@ -46,35 +46,35 @@ module.exports = function container(get, set, clear) {
       // tzn jest wypelniane w kolejnych callach
 
       if(!s.lookback || s.lookback.length -1 < lbStrgy().maxLookback) {
-        cb();
-        return;
+        cb()
+        return
       }
 
-      var lbPeriods = {};
-      let normFactor = s.lookback[0].close; // do normalizacji
+      var lbPeriods = {}
+      let normFactor = s.lookback[0].close // do normalizacji
 
       for (var step = 0; step < lbStrgy().maxStep; step++) {
-        let lbStep = lbStrgy().strtgy(step); // ile krokow wstecz
-        let lb = s.lookback[lbStep];
-        lbPeriods['back' + lbStep + '.low'] = lb.low / normFactor;
-        lbPeriods['back' + lbStep + '.high'] = lb.high / normFactor;
-        lbPeriods['back' + lbStep + '.open'] = lb.open / normFactor;
-        lbPeriods['back' + lbStep + '.close'] = lb.close / normFactor;
-        lbPeriods['back' + lbStep + '.volume'] = lb.volume / normFactor;
+        let lbStep = lbStrgy().strtgy(step) // ile krokow wstecz
+        let lb = s.lookback[lbStep]
+        lbPeriods['back' + lbStep + '.low'] = lb.low / normFactor
+        lbPeriods['back' + lbStep + '.high'] = lb.high / normFactor
+        lbPeriods['back' + lbStep + '.open'] = lb.open / normFactor
+        lbPeriods['back' + lbStep + '.close'] = lb.close / normFactor
+        lbPeriods['back' + lbStep + '.volume'] = lb.volume / normFactor
         if(step < 5) {
-          lbPeriods['back' + lbStep + '.rsi_avg_gain'] = lb.rsi_avg_gain;
-          lbPeriods['back' + lbStep + '.rsi_avg_loss'] = lb.rsi_avg_loss;
-          lbPeriods['back' + lbStep + '.rsi'] = lb.rsi;
-          lbPeriods['back' + lbStep + '.cci'] = lb.cci;
-          lbPeriods['back' + lbStep + '.srsi_D'] = lb.srsi_D;
-          lbPeriods['back' + lbStep + '.srsi_K'] = lb.srsi_K;
+          lbPeriods['back' + lbStep + '.rsi_avg_gain'] = lb.rsi_avg_gain
+          lbPeriods['back' + lbStep + '.rsi_avg_loss'] = lb.rsi_avg_loss
+          lbPeriods['back' + lbStep + '.rsi'] = lb.rsi
+          // lbPeriods['back' + lbStep + '.cci'] = lb.cci;
+          lbPeriods['back' + lbStep + '.srsi_D'] = lb.srsi_D
+          lbPeriods['back' + lbStep + '.srsi_K'] = lb.srsi_K
         }
       }
       Object.keys(lbPeriods).forEach(function(k) {
         if(lbPeriods[k] === undefined) {
-          lbPeriods[k] = null;
+          lbPeriods[k] = null
         }
-      });
+      })
 
       // resultArr.push({period: lbPeriods});
 
@@ -88,29 +88,29 @@ module.exports = function container(get, set, clear) {
 
       var options = {
         method: 'POST',
-        uri: 'http://localhost:8080/model',
+        uri: 'http://localhost:5000/fit',
         body: lbPeriods,
         json: true // Automatically stringifies the body to JSON
-      };
+      }
       rp(options)
         .then(function (parsedBody) {
-          var predictionKey = Object.keys(parsedBody).find(k => {return k.startsWith('prediction')});
+          var predictionKey = Object.keys(parsedBody).find(k => {return k.startsWith('prediction')})
           if(parsedBody[predictionKey] === 'up') {
-            s.signal = 'buy';
+            s.signal = 'buy'
             console.log('buying')
             console.log(parsedBody)
           } else if(parsedBody[predictionKey] === 'down') {
-            s.signal = 'sell';
+            s.signal = 'sell'
             console.log('selling')
             console.log(parsedBody)
           }
 
           // console.log(parsedBody)
-          cb();
+          cb()
         })
         .catch(function (err) {
           console.log(err)
-        });
+        })
 
     },
 
@@ -122,14 +122,14 @@ module.exports = function container(get, set, clear) {
   }
 }
 
-let fibonacciArr = [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 13, 15, 17, 19, 21, 24, 27, 30, 34, 40, 55, 77, 89, 120, 144, 160, 190, 233, 270, 300, 350, 400, 500, 600];
+let fibonacciArr = [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 13, 15, 17, 19, 21, 24, 27, 30, 34, 40, 55, 77, 89, 120, 144, 160, 190, 233, 270, 300, 350, 400, 500, 600]
 
 function fibonacciLbStrtgy() {
   return {
     maxStep: fibonacciArr.length,
     maxLookback: fibonacciArr[fibonacciArr.length - 1],
     strtgy: function (step) {
-      return fibonacciArr[step];
+      return fibonacciArr[step]
     }
   }
 }
