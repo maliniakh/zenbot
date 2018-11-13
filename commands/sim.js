@@ -5,10 +5,11 @@ var tb = require('timebucket')
   , path = require('path')
   , moment = require('moment')
   , colors = require('colors')
-  , Arff = require('arff-utils')
+  // , Arff = require('arff-utils')
   , objectifySelector = require('../lib/objectify-selector')
   , engineFactory = require('../lib/engine')
   , collectionService = require('../lib/services/collection-service')
+  , obj2cvs = require('objects-to-csv')
   , _ = require('lodash')
 
 module.exports = function (program, conf) {
@@ -204,28 +205,34 @@ module.exports = function (program, conf) {
           var out_target = so.filename || 'simulations/sim_result_' + so.selector.normalized +'_' + new Date().toISOString().replace(/T/, '_').replace(/\..+/, '').replace(/-/g, '').replace(/:/g, '').replace(/20/, '') + '_UTC.html'
           var basename = 'simulations/sim_result_' + so.selector.normalized +'_' + new Date().toISOString().replace(/T/, '_').replace(/\..+/, '').replace(/-/g, '').replace(/:/g, '').replace(/20/, '')
 
-          data = s.lookback.slice(0, s.lookback.length - so.min_periods).map(function (period) {
-            return {period: {
-              time: period.time,
-              open: period.open,
-              high: period.high,
-              low: period.low,
-              close: period.close,
-              volume: period.volume
-            }}
-          })
+          // data = s.lookback.slice(0, s.lookback.length - so.min_periods).map(function (period) {
+          //   return {period: {
+          //     time: period.time,
+          //     open: period.open,
+          //     high: period.high,
+          //     low: period.low,
+          //     close: period.close,
+          //     volume: period.volume
+          //   }}
+          // })
 
-          let arff = getInstances(s.lookback, fibonacciLbStrtgy, 5)
-          var ws = new require('stream')
-          ws.writable = true
-          var output = ''
-          ws.write = function(buf) {
-            // output += buf;
-            fs.appendFileSync(basename + '.arff', buf)
-          }
-          arff.writeToStream(ws)
+          let formerArff = getInstances(s.lookback, fibonacciLbStrtgy, 5);
 
-          // fs.writeFileSync(basename + '.arff', output);
+          (async() =>{
+            await new obj2cvs(formerArff).toDisk(basename + '.csv', {header: true});;
+          })();
+
+
+          // let ws = new require('stream');
+          // ws.writable = true
+          // let output = '';
+          // ws.write = function(buf) {
+          //   // output += buf;
+          //   fs.appendFileSync(basename + '.formerArff', buf)
+          // }
+          // formerArff.writeToStream(ws)
+
+          // fs.writeFileSync(basename + '.formerArff', output);
           //fs.writeFileSync(out_target, out);
           console.log('wrote', out_target)
         }
@@ -314,37 +321,37 @@ module.exports = function (program, conf) {
    */
   function getInstances(lookBack, lbStrgy, lookAhead) {
     var resultArr = []
-    var arff = new Arff.ArffWriter('chuj', Arff.MODE_OBJECT) //todo: dodac nazwe
+    // var arff = new Arff.ArffWriter('chuj', Arff.MODE_OBJECT) //todo: dodac nazwe
 
-    for (var step = 0; step < lbStrgy().maxStep; step++) {
-      var lb = lbStrgy().strtgy(step)
-      arff.addNumericAttribute('back' + lb + '.low')
-      arff.addNumericAttribute('back' + lb + '.high')
-      arff.addNumericAttribute('back' + lb + '.open')
-      arff.addNumericAttribute('back' + lb + '.close')
-      arff.addNumericAttribute('back' + lb + '.volume')
-      if(step < 5) {
-        arff.addNumericAttribute('back' + lb + '.rsi_avg_gain')
-        arff.addNumericAttribute('back' + lb + '.rsi_avg_loss')
-        arff.addNumericAttribute('back' + lb + '.rsi')
-        arff.addNumericAttribute('back' + lb + '.cci')
-        // arff.addNumericAttribute('back' + lb + '.srsi_D')
-        // arff.addNumericAttribute('back' + lb + '.srsi_K')
-      }
-    }
-    for(var k = 1; k <= lookAhead; k ++) {
-      arff.addNumericAttribute('ahead' + k + '.low')
-      arff.addNumericAttribute('ahead' + k + '.high')
-      arff.addNumericAttribute('ahead' + k + '.close')
-    }
-    arff.addNominalAttribute('trend')
+    // for (var step = 0; step < lbStrgy().maxStep; step++) {
+    //   var lb = lbStrgy().strtgy(step)
+    //   arff.addNumericAttribute('back' + lb + '.low')
+    //   arff.addNumericAttribute('back' + lb + '.high')
+    //   arff.addNumericAttribute('back' + lb + '.open')
+    //   arff.addNumericAttribute('back' + lb + '.close')
+    //   arff.addNumericAttribute('back' + lb + '.volume')
+    //   if(step < 5) {
+    //     arff.addNumericAttribute('back' + lb + '.rsi_avg_gain')
+    //     arff.addNumericAttribute('back' + lb + '.rsi_avg_loss')
+    //     arff.addNumericAttribute('back' + lb + '.rsi')
+    //     arff.addNumericAttribute('back' + lb + '.cci')
+    //     // arff.addNumericAttribute('back' + lb + '.srsi_D')
+    //     // arff.addNumericAttribute('back' + lb + '.srsi_K')
+    //   }
+    // }
+    // for(var k = 1; k <= lookAhead; k ++) {
+    //   arff.addNumericAttribute('ahead' + k + '.low')
+    //   arff.addNumericAttribute('ahead' + k + '.high')
+    //   arff.addNumericAttribute('ahead' + k + '.close')
+    // }
+    // arff.addNominalAttribute('trend')
 
 
     for (var i = lookAhead; i < lookBack.length - lbStrgy().maxLookback; i++) {
       var lbPeriods = {}
       let normFactor = lookBack[i].close // do normalizacji
 
-      for (step = 0; step < lbStrgy().maxStep; step++) {
+      for (var step = 0; step < lbStrgy().maxStep; step++) {
         let lbIdx = lbStrgy().strtgy(step)
         let lb = lookBack[i + lbIdx]
         lbPeriods['back' + lbIdx + '.low'] = precise(lb.low / normFactor)
@@ -356,7 +363,7 @@ module.exports = function (program, conf) {
           lbPeriods['back' + lbIdx + '.rsi_avg_gain'] = precise(lb.rsi_avg_gain)
           lbPeriods['back' + lbIdx + '.rsi_avg_loss'] = precise(lb.rsi_avg_loss)
           lbPeriods['back' + lbIdx + '.rsi'] = precise(lb.rsi)
-          lbPeriods['back' + lbIdx + '.cci'] = precise(lb.cci)
+          // lbPeriods['back' + lbIdx + '.cci'] = precise(lb.cci)
           // lbPeriods['back' + lbIdx + '.srsi_D'] = precise(lb.srsi_D);
           // lbPeriods['back' + lbIdx + '.srsi_K'] = precise(lb.srsi_K);
         }
@@ -370,8 +377,8 @@ module.exports = function (program, conf) {
       }
 
       // dodajemy wszystkie ahead(1--lookAhead)
-      var trend = null
-      var low, high, close  // do trendu
+      let trend = null;
+      let low, high, close;  // do trendu
       for(k = 1; k <= lookAhead; k ++) {
         lbPeriods['ahead' + k + '.low'] = low = precise(lookBack[i - k].low / normFactor)
         lbPeriods['ahead' + k + '.high'] = high = precise(lookBack[i - k].high / normFactor)
@@ -388,16 +395,18 @@ module.exports = function (program, conf) {
       }
       lbPeriods['trend'] = trend || 'flat'
 
-      arff.addData(lbPeriods)
-      resultArr.push({period: lbPeriods})
+      // arff.addData(lbPeriods)
+      resultArr.push(/*{period: */lbPeriods/*}*/)
     }
 
     // arff.writeToStream(process.stdout);
 
-    return arff
+    return resultArr;
   }
 
   let fibonacciArr = [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 13, 15, 17, 19, 21, 24, 27, 30, 34, 40, 55, 77, 89, 120, 144, 160, 190, 233, 270, 300, 350, 400, 500, 600]
+  // let fibonacciArr = [0, 1];
+
 
   function fibonacciLbStrtgy() {
     return {
