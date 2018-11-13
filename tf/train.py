@@ -5,6 +5,8 @@ from pandas import DataFrame
 from sklearn.preprocessing import MultiLabelBinarizer, LabelBinarizer
 from sklearn.utils import shuffle
 from tensorflow.python.keras import optimizers
+import time
+
 
 
 def create_file_reader_ops(filename):
@@ -62,7 +64,8 @@ csv = shuffle(csv)
 model = tf.keras.models.Sequential([
   # tf.keras.layers.Dense(100, activation=tf.nn.sigmoid),
   #   tf.keras.layers.Conv1D(32, 7,activation=tf.nn.sigmoid),
-  tf.keras.layers.Dense(80, activation=tf.nn.sigmoid),
+    # tf.keras..layers.Flatten(),
+  tf.keras.layers.Dense(80, activation=tf.nn.sigmoid, input_shape=(train_x.shape[1],)),
   tf.keras.layers.Dense(20, activation=tf.nn.sigmoid),              # z relu wychodzily nany same
   tf.keras.layers.Dense(3, activation=tf.nn.sigmoid)
 ])
@@ -76,6 +79,10 @@ model.compile(optimizer='adam',
 model.fit(train_x, train_y, epochs=1)
 test_loss, test_acc = model.evaluate(test_x, test_y)
 print('Test: ', test_acc, " ", test_loss)
+
+model_filename = 'model.{}.{}.h5'.format(time.strftime("%Y%m%d%H%M"), int(100*test_acc))
+model.save(model_filename)
+print("Model saved to " + model_filename)
 
 
 # for i in range(10):
