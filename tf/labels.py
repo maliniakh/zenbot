@@ -1,9 +1,10 @@
+from typing import Union
 import numpy as np
 
-def binarize(arr: np.ndarray):
+def binarize(arr: Union[np.ndarray, list]):
     return [tobin(x) for x in arr]
 
-def debinarize(arr: np.ndarray):
+def debinarize(arr: Union[np.ndarray, list]):
     return [frombin(x) for x in arr]
 
 def tobin(label):
@@ -35,4 +36,6 @@ print(binarized)
 
 debinarized = debinarize(binarized)
 print(debinarized)
+
+print(type([1]))
 
