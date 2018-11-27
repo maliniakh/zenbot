@@ -7,23 +7,30 @@ from subprocess import check_output
 
 date = date.today()
 date_format = "%Y%m%d"
-step = 1
-steps = 5
+step = 1  # w dniach
+steps = 2
 
-for i in range(steps):
-    end = datetime.strftime(date, date_format)
-    date = date - timedelta(days=step)
-    start = datetime.strftime(date, date_format)
-    cmd = "node --max-old-space-size=4096 zenbot.js sim --strategy noop poloniex.xrp-usdt " \
-          "--start='{}0000' --end='{}0000' --period 1m".format(start, end)
+pairs = open("pairs/binance").read().splitlines()
 
-    print(cmd)
-    call(cmd, shell=True)
+for pair in pairs:
+    for i in range(steps):
+        end = datetime.strftime(date, date_format)
+        date = date - timedelta(days=step)
+        start = datetime.strftime(date, date_format)
+        cmd = "node --max-old-space-size=4096 zenbot.js sim --strategy noop {} " \
+              "--start='{}0000' --end='{}0000' --period 1m".format(pair, start, end)
 
-ls = check_output('ls -t /home/maliniak/code/zenbot/simulations/*.csv | head -{}'.format(steps), shell=True)\
-    .decode("utf-8")
-ls = str.replace(ls, "\n", " ")
-call("cat {} > simulations/merged.csv".format(ls), shell=True)
-call("sed '2,${ /trend/d }' simulations/merged.csv | sponge simulations/merged.csv", shell=True)
-print(ls)
+        print(cmd)
+        call(cmd, shell=True)
+
+        # todo: zamiast robic ls lepiej po prostu ustalic nazwy plikow
+        ls = check_output('ls -t /home/maliniak/code/zenbot/simulations/*{}*.csv'.format(pair), shell=True)
+        print(ls)
+        ls = check_output('ls -t /home/maliniak/code/zenbot/simulations/sim_result*{}*.csv | head -{}'.format(pair, steps),
+                          shell=True)\
+            .decode("utf-8")
+        ls = str.replace(ls, "\n", " ")
+        call("cat {} > simulations/merged-{}.csv".format(ls, pair), shell=True)
+        # usuniecie headerow z csvow oprocz pierwszego
+        call("sed '2,${{ /trend/d }}' simulations/merged-{}.csv | sponge simulations/merged-{}.csv".format(pair, pair), shell=True)
 
