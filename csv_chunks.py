@@ -5,14 +5,17 @@ from subprocess import call
 from subprocess import check_output
 
 
-date = date.today()
 date_format = "%Y%m%d"
-step = 1  # w dniach
-steps = 2
+# todo: sparametryzowac
+step = 30  # w dniach
+steps = 1
 
+# todo: sparametryzowac
 pairs = open("pairs/binance").read().splitlines()
 
 for pair in pairs:
+    date = date.today()
+
     for i in range(steps):
         end = datetime.strftime(date, date_format)
         date = date - timedelta(days=step)
