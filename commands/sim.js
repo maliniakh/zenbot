@@ -10,6 +10,7 @@ var tb = require('timebucket')
   , engineFactory = require('../lib/engine')
   , collectionService = require('../lib/services/collection-service')
   , obj2cvs = require('objects-to-csv')
+  , assert = require('assert')
   , _ = require('lodash')
 
 module.exports = function (program, conf) {
@@ -49,6 +50,7 @@ module.exports = function (program, conf) {
     .option('--backtester_generation <generation>','creates a json file in simulations with the generation number', Number, -1)
     .option('--verbose', 'print status lines on every period')
     .option('--silent', 'only output on completion (can speed up sim)')
+    .option('--diff <diff>', 'TODO', Number, 11)
     .action(function (selector, cmd) {
       var s = { options: minimist(process.argv) }
       var so = s.options
@@ -233,7 +235,7 @@ module.exports = function (program, conf) {
           // formerArff.writeToStream(ws)
 
           // fs.writeFileSync(basename + '.formerArff', output);
-          //fs.writeFileSync(out_target, out);
+          // fs.writeFileSync(out_target, out);
           console.log('wrote', out_target)
         }
         simResults.save(options_output)
@@ -321,31 +323,6 @@ module.exports = function (program, conf) {
    */
   function getInstances(lookBack, lbStrgy, lookAhead) {
     var resultArr = []
-    // var arff = new Arff.ArffWriter('chuj', Arff.MODE_OBJECT) //todo: dodac nazwe
-
-    // for (var step = 0; step < lbStrgy().maxStep; step++) {
-    //   var lb = lbStrgy().strtgy(step)
-    //   arff.addNumericAttribute('back' + lb + '.low')
-    //   arff.addNumericAttribute('back' + lb + '.high')
-    //   arff.addNumericAttribute('back' + lb + '.open')
-    //   arff.addNumericAttribute('back' + lb + '.close')
-    //   arff.addNumericAttribute('back' + lb + '.volume')
-    //   if(step < 5) {
-    //     arff.addNumericAttribute('back' + lb + '.rsi_avg_gain')
-    //     arff.addNumericAttribute('back' + lb + '.rsi_avg_loss')
-    //     arff.addNumericAttribute('back' + lb + '.rsi')
-    //     arff.addNumericAttribute('back' + lb + '.cci')
-    //     // arff.addNumericAttribute('back' + lb + '.srsi_D')
-    //     // arff.addNumericAttribute('back' + lb + '.srsi_K')
-    //   }
-    // }
-    // for(var k = 1; k <= lookAhead; k ++) {
-    //   arff.addNumericAttribute('ahead' + k + '.low')
-    //   arff.addNumericAttribute('ahead' + k + '.high')
-    //   arff.addNumericAttribute('ahead' + k + '.close')
-    // }
-    // arff.addNominalAttribute('trend')
-
 
     for (var i = lookAhead; i < lookBack.length - lbStrgy().maxLookback; i++) {
       var lbPeriods = {}
@@ -354,6 +331,12 @@ module.exports = function (program, conf) {
       for (var step = 0; step < lbStrgy().maxStep; step++) {
         let lbIdx = lbStrgy().strtgy(step)
         let lb = lookBack[i + lbIdx]
+
+        // cena absolutna, do wizualizacji, trzeba wykluczyc w nn przy uczeniu
+        if(step === 0) {
+          lbPeriods['back' + lbIdx + '.close_abs'] = lb.close
+        }
+
         lbPeriods['back' + lbIdx + '.low'] = precise(lb.low / normFactor)
         lbPeriods['back' + lbIdx + '.high'] = precise(lb.high / normFactor)
         lbPeriods['back' + lbIdx + '.open'] = precise(lb.open / normFactor)
@@ -371,7 +354,7 @@ module.exports = function (program, conf) {
         // todo: infinity tez sprawdzic
         for(var k in lbPeriods) {
           if(lbPeriods[k] === null || isNaN(lbPeriods[k])) {
-            // throw new Error(k)
+            throw new Error(k)
           }
         }
       }
@@ -394,6 +377,23 @@ module.exports = function (program, conf) {
         }
       }
       lbPeriods['trend'] = trend || 'flat'
+
+      // obliczamy maxInDay; zakladamy ze period to 1m co by nie jebac sie z programowaniem tego
+      // todo: przemyslec bo na te chwile jak jestesmy 'blisko terazniejszosci' to wynik max/mininday jest skewed
+      // todo: czyli ze trzeba miec zapas jednego dnia do przodu
+      assert.strictEqual(lookBack[i].size, '1m')
+      var minInDay = Number.MAX_VALUE
+      var maxInDay = 0
+      for(k = i; k >= 0 && k <  24 * 60; k--) {
+        if(lookBack[k].low < minInDay) {
+          minInDay = lookBack[k].low
+        }
+        if(lookBack[k].high > maxInDay) {
+          maxInDay = lookBack[k].high
+        }
+      }
+      lbPeriods['mininday'] = precise(minInDay / normFactor)
+      lbPeriods['maxinday'] = precise(maxInDay / normFactor)
 
       // arff.addData(lbPeriods)
       resultArr.push(/*{period: */lbPeriods/*}*/)
