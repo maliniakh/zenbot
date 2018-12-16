@@ -324,6 +324,7 @@ module.exports = function (program, conf) {
   function getInstances(lookBack, lbStrgy, lookAhead) {
     var resultArr = []
 
+    // i = lookAhead zeby wszystkie wartosci byly dostepne
     for (var i = lookAhead; i < lookBack.length - lbStrgy().maxLookback; i++) {
       var lbPeriods = {}
       let normFactor = lookBack[i].close // do normalizacji
@@ -331,6 +332,8 @@ module.exports = function (program, conf) {
       for (var step = 0; step < lbStrgy().maxStep; step++) {
         let lbIdx = lbStrgy().strtgy(step)
         let lb = lookBack[i + lbIdx]
+
+        lbPeriods['time'] = lb.time
 
         // cena absolutna, do wizualizacji, trzeba wykluczyc w nn przy uczeniu
         if(step === 0) {
@@ -384,7 +387,7 @@ module.exports = function (program, conf) {
       assert.strictEqual(lookBack[i].size, '1m')
       var minInDay = Number.MAX_VALUE
       var maxInDay = 0
-      for(k = i; k >= 0 && k <  24 * 60; k--) {
+      for(k = i; k >= 0 && k > (i - 24 * 60); k--) {
         if(lookBack[k].low < minInDay) {
           minInDay = lookBack[k].low
         }
@@ -392,6 +395,10 @@ module.exports = function (program, conf) {
           maxInDay = lookBack[k].high
         }
       }
+      if(minInDay === Number.MAX_VALUE || maxInDay === 0) {
+        throw new Error()
+      }
+
       lbPeriods['mininday'] = precise(minInDay / normFactor)
       lbPeriods['maxinday'] = precise(maxInDay / normFactor)
 
