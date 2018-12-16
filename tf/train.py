@@ -6,8 +6,6 @@ from sklearn.utils import shuffle
 import time
 import labels
 
-
-
 def create_file_reader_ops(filename):
     headers = get_csv_headers(filename)
     record_defaults = list(map(lambda h: [0.0] if "trend" in h else [0.0], headers))
@@ -36,25 +34,40 @@ def get_csv_headers(filename):
         line = fp.readline()
         return np.asarray(list(map(lambda s: s.strip(), line.split(","))))
 
-def get_data(df: DataFrame):
-    df = df[:10000]
+
+def get_data(df: DataFrame, split: float=0.9):
+    """
+    :param df:
+    :type split: float jak 1 to zwraca tylko (train_x, train_y, close_abs)
+    """
+    # df = df[:10000]
     df = df.loc[:, [c for c in list(df.columns) if 'cci' not in c]] #cci jest nan, moze dlatego
-    x = df.loc[:, [c for c in list(df.columns) if not c.startswith('ahead') and c != 'trend']].values.astype('float32')
-    y = df.loc[:, 'trend'].values
-    y = labels.binarize(y)
+    x = df.loc[:, [c for c in list(df.columns) if
+                   not c.startswith('ahead')
+                   and c != 'trend'
+                   and c != 'maxinday' and c != 'mininday'
+                   and 'close_abs' not in c]].values.astype('float32')
+    y = df.loc[:, 'maxinday'].values
+    # y = labels.binarize(y)
     rows_no = df.shape[0]
-    split_idx = int(rows_no * 0.9)
+    split_idx = int(rows_no * split)
     train_x = x[:split_idx]
     train_y = y[:split_idx]
     test_x = x[split_idx:]
     test_y = y[split_idx:]
-    return (train_x, train_y, test_x, test_y)
+
+    if(split == 1):
+        close_abs = df.loc[:, ['back0.close_abs']].values.astype('float32')
+        return train_x, train_y, close_abs
+
+    return train_x, train_y, test_x, test_y
+
 
 filename = "/home/maliniak/code/zenbot/simulations/merged.csv"
 # features, label.py = create_file_reader_ops(filename)
 
 # low_memory : boolean, default True?
-csv = pd.read_csv(filename)
+csv = pd.read_csv(filename, low_memory=False)
 csv = shuffle(csv)
 (train_x, train_y, test_x, test_y) = get_data(csv)
 
@@ -62,15 +75,16 @@ model = tf.keras.models.Sequential([
   # tf.keras.layers.Dense(100, activation=tf.nn.sigmoid),
   #   tf.keras.layers.Conv1D(32, 7,activation=tf.nn.sigmoid),
     # tf.keras..layers.Flatten(),
-  tf.keras.layers.Dense(80, activation=tf.nn.sigmoid, input_shape=(train_x.shape[1],)),
-  tf.keras.layers.Dense(20, activation=tf.nn.sigmoid),              # z relu wychodzily nany same
-  tf.keras.layers.Dense(3, activation=tf.nn.sigmoid)
+  tf.keras.layers.Dense(80, activation=tf.nn.tanh, input_shape=(train_x.shape[1],)),
+  tf.keras.layers.Dense(20, activation=tf.nn.tanh),              # z relu wychodzily nany same
+  tf.keras.layers.Dense(1, activation=tf.nn.relu)
 ])
 
 # sgd = optimizers.SGD(lr=0.001, decay=1e-6, momentum=0.9, nesterov=True)
 model.compile(optimizer='adam',
               #sparse_categorical_crossentropy
-              loss='categorical_crossentropy',
+              #loss='categorical_crossentropy',
+              loss='mean_squared_error',
               metrics=['accuracy'])
 
 model.fit(train_x, train_y, epochs=1)
@@ -81,12 +95,16 @@ model_filename = 'model/model.{}.{}.h5'.format(time.strftime("%Y%m%d%H%M"), int(
 model.save(model_filename)
 print("Model saved to " + model_filename)
 
+x, y, close_abs = get_data(pd.read_csv('/home/maliniak/code/zenbot/simulations/merged-binance.ADA-BTC.csv', low_memory=False), split=1)
+predict = model.predict(x)
+
+for i in range(100):
+    print(np.round(y[i], 2), "\t", np.round(predict[i], 2))
 
 # for i in range(10):
 # print(lb.classes_)
-predict = model.predict(test_x)
-for i in range(5):
-    print(np.round(test_y[i], 2), "\n", np.round(predict[i], 2))
+# predict = model.predict(test_x)
+
 
 
 
