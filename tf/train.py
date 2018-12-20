@@ -5,6 +5,9 @@ from pandas import DataFrame
 from sklearn.utils import shuffle
 import time
 import labels
+import matplotlib.pyplot as plt
+import data
+
 
 def create_file_reader_ops(filename):
     headers = get_csv_headers(filename)
@@ -35,41 +38,15 @@ def get_csv_headers(filename):
         return np.asarray(list(map(lambda s: s.strip(), line.split(","))))
 
 
-def get_data(df: DataFrame, split: float=0.9):
-    """
-    :param df:
-    :type split: float jak 1 to zwraca tylko (train_x, train_y, close_abs)
-    """
-    # df = df[:10000]
-    df = df.loc[:, [c for c in list(df.columns) if 'cci' not in c]] #cci jest nan, moze dlatego
-    x = df.loc[:, [c for c in list(df.columns) if
-                   not c.startswith('ahead')
-                   and c != 'trend'
-                   and c != 'maxinday' and c != 'mininday'
-                   and 'close_abs' not in c]].values.astype('float32')
-    y = df.loc[:, 'maxinday'].values
-    # y = labels.binarize(y)
-    rows_no = df.shape[0]
-    split_idx = int(rows_no * split)
-    train_x = x[:split_idx]
-    train_y = y[:split_idx]
-    test_x = x[split_idx:]
-    test_y = y[split_idx:]
-
-    if(split == 1):
-        close_abs = df.loc[:, ['back0.close_abs']].values.astype('float32')
-        return train_x, train_y, close_abs
-
-    return train_x, train_y, test_x, test_y
 
 
-filename = "/home/maliniak/code/zenbot/simulations/merged.csv"
+filename = "/home/maliniak/code/zenbot/simulations/merged-binance.csv"
 # features, label.py = create_file_reader_ops(filename)
 
 # low_memory : boolean, default True?
 csv = pd.read_csv(filename, low_memory=False)
 csv = shuffle(csv)
-(train_x, train_y, test_x, test_y) = get_data(csv)
+(train_x, train_y, test_x, test_y) = data.get_data(csv)
 
 model = tf.keras.models.Sequential([
   # tf.keras.layers.Dense(100, activation=tf.nn.sigmoid),
@@ -95,12 +72,26 @@ model_filename = 'model/model.{}.{}.h5'.format(time.strftime("%Y%m%d%H%M"), int(
 model.save(model_filename)
 print("Model saved to " + model_filename)
 
-x, y, close_abs = get_data(pd.read_csv('/home/maliniak/code/zenbot/simulations/merged-binance.ADA-BTC.csv', low_memory=False), split=1)
+x, y, close_abs, maxinday = data.get_data(pd.read_csv('/home/maliniak/code/zenbot/simulations/sim_result_binance.STEEM-BTC_181218_151700.csv', low_memory=False), split=1)
 predict = model.predict(x)
 
-for i in range(100):
-    print(np.round(y[i], 2), "\t", np.round(predict[i], 2))
+# for i in range(100):,
+#     print(np.round(y[i], 2), "\t", np.round(predict[i], 2))
 
+predicted_abs = []
+real_max_in_day = []
+for i in range(y.shape[0]):
+    predicted_abs.append(close_abs[i] * predict[i])
+    real_max_in_day.append(close_abs[i] * maxinday[i])
+
+fig, ax = plt.subplots()
+ax.plot(close_abs, 'r', predicted_abs, 'b', real_max_in_day, 'g')
+ax.grid(True)
+fig.autofmt_xdate()
+plt.show()
+
+
+i = 2
 # for i in range(10):
 # print(lb.classes_)
 # predict = model.predict(test_x)
